@@ -14,3 +14,5 @@ class OTPBankHistoryParser:
 
     def print(self):
         print(str(self.sorter.sum) + " : " + self.sorter.category_sum_dict.__str__())
+        for w in sorted(self.sorter.category_sum_dict, key=self.sorter.category_sum_dict.get, reverse=False):
+            print(w + ": " + str(self.sorter.category_sum_dict[w]))

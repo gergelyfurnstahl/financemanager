@@ -1,10 +1,15 @@
 import csv
 import re
+
+from PyQt5.QtWidgets import QMainWindow, QApplication
+
 from CategoryRegex import CategoryRegex
 from OTPBankHistoryParser import OTPBankHistoryParser
 import json
 from ExtendedJSONSerializer import ExtendedJSONSerializer
-
+from PyQt5 import uic
+from PyQt5 import *
+from mainwindow import Ui_MainWindow
 
 def saveData(data):
     with open('C:/work/financemanager/data/regex_category.txt', "w") as file:
@@ -37,20 +42,7 @@ def category_init(data_dict):
         category_dict[key] = []
     return category_dict
 
-def test(files):
-    category_regex_dict = CategoryRegex.read_json_regex_dict('category_dict.json')
-    for file in files:
-        parser = OTPBankHistoryParser(category_regex_dict)
-        parser.parse_bank_history(file)
-        parser.print()
-
 def main():
-    category_regex_list = readData()
-    category_regex_list["Unknown"] = []
-    category_comments = category_init(category_regex_list)
-    category_sum = sum_init(category_regex_list)
-    unknown_sum = {}
-    monthly_sum = 0
     aimotivefiles = [
         "C:/work/financemanager/data/201811.csv",
         "C:/work/financemanager/data/201812.csv",
@@ -70,68 +62,46 @@ def main():
     ibkrfiles = [
         "C:/work/financemanager/data/201909.csv",
         "C:/work/financemanager/data/201910.csv",
-        "C:/work/financemanager/data/201911.csv"
+        "C:/work/financemanager/data/201911.csv",
+        "C:/work/financemanager/data/201912.csv"
     ]
 
     allfiles = aimotivefiles
     allfiles.extend(joblessfiles)
     allfiles.extend(ibkrfiles)
 
-    currentfiles = allfiles
+    currentfiles = ibkrfiles
 
-    test(currentfiles)
-    for filename in currentfiles:
+    notfoundentries = []
+    stats = []
+    category_regex_dict = CategoryRegex.read_json_regex_dict('category_dict.json')
+    categories = list(category_regex_dict.keys())
+    categories.append("notfound")
+    categorysums = {}
+    for cat in categories:
+        categorysums[cat] = 0
 
-        month_category_sum = sum_init(category_regex_list)
+    for file in currentfiles:
+        parser = OTPBankHistoryParser(category_regex_dict)
+        parser.parse_bank_history(file)
 
-        with open(filename) as csv_file:
-            csv_reader = csv.DictReader(csv_file, delimiter=';')
-            line_count = 0
-            for row in csv_reader:
-                if int(row["Amount"]) < 0:
-                    found = False
-                    for category, regex_list in category_regex_list.items():
-                        for regex in regex_list:
-                            if re.search(regex, row["Comment"]):
-                                found = True
-                                category_comments[category].append(row["Comment"])
-                                month_category_sum[category] += int(row["Amount"])
-                                break
-                    if not found:
-                        category_comments["Unknown"].append(row["Comment"])
-                        month_category_sum["Unknown"] += int(row["Amount"])
-                        if row["Comment"] not in unknown_sum:
-                            unknown_sum[row["Comment"]] = 0
-                        unknown_sum[row["Comment"]] += int(row["Amount"])
+        for category in categories:
+            for Tdata in parser.sorter.category_data_dict[category]:
+                categorysums[category] += Tdata.amount
 
-        monthly_sum = 0
-        for val in month_category_sum.values():
-            monthly_sum += val
-        print(filename.split("/")[-1]+" month: " + monthly_sum.__str__() + " : " + month_category_sum.__str__())
-        for key, value in month_category_sum.items():
-            category_sum[key] += value
+        for Tdata in parser.sorter.category_data_dict["notfound"]:
+            notfoundentries.append(Tdata.__str__())
 
-    average = "average    month: "
-    averagetmp = ""
-    averagesum = 0
-    for key, value in category_sum.items():
-        averagesum += int(value/len(currentfiles))
-        averagetmp += "'" + key+"': "+int(value/len(currentfiles)).__str__()+", "
-    average += averagesum.__str__() + " : {" + averagetmp[:-2] + '}'
-    print(average)
-    print("Sum        month: " + category_sum.__str__())
-#    for key, value in category_comments.items():
-#        print(key)
-#        for v in value:
-#            print(v)
-    unknown_keys = []
-    unknown_values = []
-    for key, value in unknown_sum.items():
-        unknown_keys.append(key)
-        unknown_values.append(value)
-    for money in sorted(unknown_values):
-        id = unknown_values.index(money)
-        print(unknown_keys[id] + " : " + unknown_values[id].__str__())
-#    print(other_sum)
+    for key,val in categorysums.items():
+        stats.append(key +" average: " + str(val/len(currentfiles)))
+    app = QApplication([])
+    MainWindow = QMainWindow()
+    ui = Ui_MainWindow()
+    ui.setupUi(MainWindow)
+    MainWindow.show()
+    ui.notfoundlist.addItems(notfoundentries)
+    ui.statsList.addItems(stats)
+
+    app.exec_()
 
 main()
